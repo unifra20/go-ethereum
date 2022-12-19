@@ -118,19 +118,22 @@ func (t *ZkTrie) GetKey(kHashBytes []byte) []byte {
 }
 
 // Commit writes all nodes and the secure hash pre-images to the trie's database.
-// Nodes are stored with their sha3 hash as the key.
+// Nodes are stored with their hash as the key.
 //
 // Committing flushes nodes from memory. Subsequent Get calls will load nodes
 // from the database.
 func (t *ZkTrie) Commit(LeafCallback) (common.Hash, int, error) {
-	// in current implmentation, every update of trie already writes into database
-	// so Commmit does nothing
-	return t.Hash(), 0, nil
+	var hash common.Hash
+	h, count, err := t.ZkTrie.Commit()
+	hash.SetBytes(h.Bytes())
+	return hash, count, err
 }
 
 // Hash returns the root hash of SecureBinaryTrie. It does not write to the
 // database and can be used even if the trie doesn't have one.
 func (t *ZkTrie) Hash() common.Hash {
+	// h, _, _ := t.Commit(nil)
+	// return h
 	var hash common.Hash
 	hash.SetBytes(t.ZkTrie.Hash())
 	return hash
