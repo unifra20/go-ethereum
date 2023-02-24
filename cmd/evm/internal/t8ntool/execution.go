@@ -57,6 +57,7 @@ type ExecutionResult struct {
 	Rejected    []*rejectedTx         `json:"rejected,omitempty"`
 	Difficulty  *math.HexOrDecimal256 `json:"currentDifficulty" gencodec:"required"`
 	GasUsed     math.HexOrDecimal64   `json:"gasUsed"`
+	BaseFee     *math.HexOrDecimal256 `json:"currentBaseFee,omitempty"`
 }
 
 type ommer struct {
@@ -69,6 +70,9 @@ type stEnv struct {
 	Coinbase         common.Address                      `json:"currentCoinbase"   gencodec:"required"`
 	Difficulty       *big.Int                            `json:"currentDifficulty"`
 	ParentDifficulty *big.Int                            `json:"parentDifficulty"`
+	ParentBaseFee    *big.Int                            `json:"parentBaseFee,omitempty"`
+	ParentGasUsed    uint64                              `json:"parentGasUsed,omitempty"`
+	ParentGasLimit   uint64                              `json:"parentGasLimit,omitempty"`
 	GasLimit         uint64                              `json:"currentGasLimit"   gencodec:"required"`
 	Number           uint64                              `json:"currentNumber"     gencodec:"required"`
 	Timestamp        uint64                              `json:"currentTimestamp"  gencodec:"required"`
@@ -83,6 +87,9 @@ type stEnvMarshaling struct {
 	Coinbase         common.UnprefixedAddress
 	Difficulty       *math.HexOrDecimal256
 	ParentDifficulty *math.HexOrDecimal256
+	ParentBaseFee    *math.HexOrDecimal256
+	ParentGasUsed    math.HexOrDecimal64
+	ParentGasLimit   math.HexOrDecimal64
 	GasLimit         math.HexOrDecimal64
 	Number           math.HexOrDecimal64
 	Timestamp        math.HexOrDecimal64
@@ -258,12 +265,13 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		Rejected:    rejectedTxs,
 		Difficulty:  (*math.HexOrDecimal256)(vmContext.Difficulty),
 		GasUsed:     (math.HexOrDecimal64)(gasUsed),
+		BaseFee:     (*math.HexOrDecimal256)(vmContext.BaseFee),
 	}
 	return statedb, execRs, nil
 }
 
 func MakePreState(db ethdb.Database, accounts core.GenesisAlloc) *state.StateDB {
-	sdb := state.NewDatabase(db)
+	sdb := state.NewDatabaseWithConfig(db, &trie.Config{Preimages: true})
 	statedb, _ := state.New(common.Hash{}, sdb, nil)
 	for addr, a := range accounts {
 		statedb.SetCode(addr, a.Code)
