@@ -147,6 +147,7 @@ func (api *API) getBlockTrace(block *types.Block, env *traceEnv) (*types.BlockTr
 		jobs  = make(chan *txTraceTask, len(txs))
 		errCh = make(chan error, 1)
 	)
+	needGc(txs.Len())
 	threads := runtime.NumCPU()
 	if threads > len(txs) {
 		threads = len(txs)

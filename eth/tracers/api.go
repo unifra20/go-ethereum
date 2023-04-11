@@ -62,7 +62,28 @@ const (
 	// For non-archive nodes, this limit _will_ be overblown, as disk-backed tries
 	// will only be found every ~15K blocks or so.
 	defaultTracechainMemLimit = common.StorageSize(500 * 1024 * 1024)
+
+	gcInterval = int(200)
 )
+
+/*
+every transaction will increase call_trace_count 1
+if call_trace_count bigger than gcInterval, then manually GC()!
+*/
+var call_trace_count = int(0)
+var txMu sync.Mutex
+
+func needGc(txCount int) {
+	log.Debug("AAAA", "call_trace_count", call_trace_count)
+	txMu.Lock()
+	defer txMu.Unlock()
+	if call_trace_count > gcInterval {
+		log.Debug("AAAA GC")
+		go runtime.GC()
+		call_trace_count = 0
+	}
+	call_trace_count += txCount
+}
 
 // Backend interface provides the common API services (that are provided by
 // both full and light clients) with access to necessary functions.
@@ -590,6 +611,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		pend = new(sync.WaitGroup)
 		jobs = make(chan *txTraceTask, len(txs))
 	)
+	needGc(txs.Len())
 	threads := runtime.NumCPU()
 	if threads > len(txs) {
 		threads = len(txs)
@@ -777,6 +799,7 @@ func containsTx(block *types.Block, hash common.Hash) bool {
 // TraceTransaction returns the structured logs created during the execution of EVM
 // and returns them as a JSON object.
 func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *TraceConfig) (interface{}, error) {
+	needGc(1)
 	_, blockHash, blockNumber, index, err := api.backend.GetTransaction(ctx, hash)
 	if err != nil {
 		return nil, err
@@ -811,6 +834,7 @@ func (api *API) TraceTransaction(ctx context.Context, hash common.Hash, config *
 // You can provide -2 as a block number to trace on top of the pending block.
 func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, blockNrOrHash rpc.BlockNumberOrHash, config *TraceCallConfig) (interface{}, error) {
 	// Try to retrieve the specified block
+	needGc(1)
 	var (
 		err   error
 		block *types.Block
