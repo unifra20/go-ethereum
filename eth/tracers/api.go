@@ -27,6 +27,7 @@ import (
 	"os"
 	"runtime"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/scroll-tech/go-ethereum/common"
@@ -62,27 +63,28 @@ const (
 	// For non-archive nodes, this limit _will_ be overblown, as disk-backed tries
 	// will only be found every ~15K blocks or so.
 	defaultTracechainMemLimit = common.StorageSize(500 * 1024 * 1024)
-
-	gcInterval = int(200)
 )
 
-/*
-every transaction will increase call_trace_count 1
-if call_trace_count bigger than gcInterval, then manually GC()!
-*/
-var call_trace_count = int(0)
+var preGcTime time.Time = time.Now()
 var txMu sync.Mutex
 
 func needGc(txCount int) {
-	log.Debug("AAAA", "call_trace_count", call_trace_count)
 	txMu.Lock()
 	defer txMu.Unlock()
-	if call_trace_count > gcInterval {
-		log.Debug("AAAA GC")
-		go runtime.GC()
-		call_trace_count = 0
+	const GB = 1024 * 1024 * 1024
+	var info syscall.Sysinfo_t
+	if err := syscall.Sysinfo(&info); err != nil {
+		return
 	}
-	call_trace_count += txCount
+
+	if info.Freeram < 4*GB {
+		log.Debug("needGC", "Total memory", info.Totalram, "Free memory", info.Freeram)
+		if time.Since(preGcTime).Seconds() < 10 {
+			return
+		}
+		preGcTime = time.Now()
+		runtime.GC()
+	}
 }
 
 // Backend interface provides the common API services (that are provided by
