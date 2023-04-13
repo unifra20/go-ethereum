@@ -82,6 +82,7 @@ func needGc(txCount int) {
 		if time.Since(preGcTime).Seconds() < 10 {
 			return
 		}
+		log.Info("needGC yes", "Total memory", info.Totalram, "Free memory", info.Freeram, "preGcTime", preGcTime)
 		preGcTime = time.Now()
 		runtime.GC()
 	}
